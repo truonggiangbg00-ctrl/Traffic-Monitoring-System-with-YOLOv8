@@ -1,0 +1,26 @@
+# Bỏ qua môi trường ảo (Virtual Environment)
+.venv/
+venv/
+env/
+
+# Bỏ qua bộ dữ liệu huấn luyện (Dataset)
+Data/
+Data_2/
+Data_Final/
+
+# Bỏ qua các trọng số AI quá nặng (chỉ giữ lại code)
+weights/*.pt
+weights/*.engine
+weights/*.onnx
+!weights/.gitkeep  # (Mẹo: Giữ lại thư mục weights trống)
+
+# Bỏ qua video đầu vào và kết quả đầu ra
+*.mp4
+*.avi
+output/
+evidence/
+
+# Bỏ qua các file rác của Python và Hệ điều hành
+__pycache__/
+*.pyc
+.DS_Store
