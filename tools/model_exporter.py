@@ -1,42 +1,60 @@
 """
-model_exporter.py: Optimize PyTorch baseline model to TensorRT (.engine) format
+model_exporter.py: Biên dịch mô hình PyTorch (.pt) sang TensorRT (.engine)
 """
 import sys
 from pathlib import Path
 try:
     from ultralytics import YOLO
 except ImportError:
-    sys.exit("❌ ultralytics not installed.")
+    sys.exit("Thư viện ultralytics chưa được cài đặt.")
 
-def export_optimized_model():
-    project_root = Path(__file__).resolve().parent.parent
-    baseline_path = project_root / 'weights' / 'yolo_basic.pt'
+def export_to_tensorrt(pt_path, output_name):
+    """Hàm lõi để biên dịch một file .pt bất kỳ sang .engine"""
+    if not pt_path.exists():
+        print(f"Bỏ qua! Không tìm thấy file trọng số tại: {pt_path}")
+        return
+
+    print(f"\n🔄 Đang nạp mô hình từ: {pt_path}...")
+    model = YOLO(str(pt_path))
     
-    if not baseline_path.exists():
-        sys.exit(f"❌ Baseline model not found at {baseline_path}. Run train_yolo.py first.")
-        
-    print(f"🔄 Loading baseline model from {baseline_path}...")
-    model = YOLO(str(baseline_path))
-    
-    print("⚡ Exporting to TensorRT Engine format (this may take 5-10 minutes)...")
-    # Biến đổi mô hình sang FP16 (nửa độ chính xác) để tăng tối đa FPS
+    print(" Đang gọi NVIDIA TensorRT Compiler (Sẽ mất 5-10 phút, quạt tản nhiệt có thể kêu to)...")
     model.export(
         format='engine', 
-        dynamic=False,   # Cố định kích thước đầu vào để suy luận nhanh nhất
-        half=True,       # Bật FP16 optimization
-        workspace=4,     # Cấp phát 4GB VRAM để biên dịch
+        dynamic=False,   # Cố định đầu vào 640x640 để đạt max FPS
+        half=True,       # Ép kiểu FP16 giảm 50% VRAM
+        workspace=4,     # Cấp tối đa 4GB VRAM để biên dịch
         imgsz=640
     )
     
-    # YOLO sẽ sinh ra file .engine ở cùng thư mục. Ta đổi tên lại cho đúng chuẩn config.
-    exported_engine = project_root / 'weights' / 'yolo_basic.engine'
-    target_engine = project_root / 'weights' / 'yolo_optimized.engine'
+    # YOLO sẽ tự đẻ ra file .engine nằm ngay cạnh file .pt gốc
+    exported_engine = pt_path.with_suffix('.engine')
+    
+    # Ta sẽ kéo file đó ra thư mục weights ngoài cùng và đổi tên cho gọn
+    target_engine = pt_path.parent.parent.parent / output_name
     
     if exported_engine.exists():
+        # Xóa file cũ nếu đã tồn tại để tránh xung đột
+        if target_engine.exists():
+            target_engine.unlink()
+            
         exported_engine.rename(target_engine)
-        print(f"✅ Optimized model successfully saved to: {target_engine}")
+        print(f"Xuất thành công! Đã lưu tại: {target_engine}")
     else:
-        print("❌ Export process failed to generate .engine file.")
+        print(f" Lỗi: Không thể sinh ra file .engine cho {pt_path.name}")
 
 if __name__ == '__main__':
-    export_optimized_model()
+    project_root = Path(__file__).resolve().parent.parent
+    
+    print("="*80)
+    print(" BẮT ĐẦU QUÁ TRÌNH BIÊN DỊCH TENSORRT (MLOps)")
+    print("="*80)
+    
+    # 1. Biên dịch mô hình Baseline (Cơ bản)
+    baseline_pt = project_root / 'weights' / 'traffic_baseline' / 'weights' / 'best.pt'
+    export_to_tensorrt(baseline_pt, 'yolo_baseline.engine')
+    
+    # 2. Biên dịch mô hình Optimized (Đã tinh chỉnh tham số khi train)
+    optimized_pt = project_root / 'weights' / 'traffic_optimized' / 'weights' / 'best.pt'
+    export_to_tensorrt(optimized_pt, 'yolo_optimized.engine')
+    
+    print("\nHOÀN TẤT! Bạn có thể sử dụng các file .engine này trong config.py")

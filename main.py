@@ -172,13 +172,71 @@ class TrafficMonitoringSystem:
         print(f"  Total Vehicles   : {total_veh}")
         print(f"  Total Violations : {total_viol}")
         print("="*80)
+        import cv2
+# ... (Giữ nguyên toàn bộ phần code từ đầu cho đến hết hàm shutdown(self) của bạn) ...
+
+def ai_engine_worker(video_source, frame_queue, stats_queue, is_running_func):
+    """
+    Luồng chạy AI thực tế: Kết nối Class TrafficMonitoringSystem với Giao diện GUI
+    """
+    # 1. Khởi tạo hệ thống AI thật của bạn
+    # Mặc định dùng model đã tối ưu để chạy cho mượt
+    system = TrafficMonitoringSystem(model_type='pt', use_optimized=True)
+    
+    # Ghi đè nguồn video từ GUI (người dùng chọn file nào thì phân tích file đó)
+    if hasattr(system, 'cap') and system.cap:
+        system.cap.release()
+    system.cap = cv2.VideoCapture(video_source)
+    
+    while system.cap.isOpened() and is_running_func():
+        ret, frame = system.cap.read()
+        if not ret: break
+        
+        frame_start = time.time()
+        
+        # === PIPELINE LÕI AI THỰC TẾ ===
+        # Hàm này sẽ làm mọi thứ: Nhận diện, Đếm, Ghi Log, Vẽ Bbox...
+        frame_state = system.process_frame(frame)
+        
+        # Tính FPS hiện tại
+        process_time = time.time() - frame_start
+        current_fps = 1.0 / process_time if process_time > 0 else 0
+        
+        # Lấy số liệu thống kê THẬT từ các module
+        total_cars = system.counter.get_total() if hasattr(system, 'counter') else 0
+        violations = system.analyzer.get_violation_count() if hasattr(system, 'analyzer') else 0
+        
+        # 1. Đẩy khung hình (đã vẽ Bounding Box) sang GUI
+        if not frame_queue.full():
+            frame_queue.put(frame_state.processed_frame)
+            
+        # 2. Đẩy thông số thống kê sang GUI
+        if not stats_queue.full():
+            stats_queue.put({
+                'fps': current_fps,
+                'total_vehicles': total_cars,
+                'violations': violations
+            })
+
+    # Khi người dùng bấm "Dừng", gọi lệnh tắt an toàn để lưu file
+    system.shutdown()
+
 
 if __name__ == "__main__":
+    from ui.dashboard import TrafficDashboard
+    import argparse
+    
     parser = argparse.ArgumentParser()
+    parser.add_argument('--cli', action='store_true', help="Chạy chế độ Terminal (Không mở GUI)")
     parser.add_argument('--model', choices=['pt', 'engine'], default='pt')
     parser.add_argument('--optimized', action='store_true')
-    parser.add_argument('--no-display', action='store_true', help="Run without UI window")
-    
     args = parser.parse_args()
-    system = TrafficMonitoringSystem(model_type=args.model, use_optimized=args.optimized)
-    system.run(display=not args.no_display)
+    
+    if args.cli:
+        # Chạy chế độ màn hình đen đen truyền thống (Terminal)
+        system = TrafficMonitoringSystem(model_type=args.model, use_optimized=args.optimized)
+        system.run(display=True)
+    else:
+        # Chạy chế độ Giao diện người dùng hiện đại (Mặc định)
+        app = TrafficDashboard(ai_engine_callback=ai_engine_worker)
+        app.mainloop()
