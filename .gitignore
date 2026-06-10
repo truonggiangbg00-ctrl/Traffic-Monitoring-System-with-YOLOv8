@@ -6,6 +6,8 @@ env/
 # Bỏ qua bộ dữ liệu huấn luyện (Dataset)
 Data/
 Data_2/
+Data_3/
+Data_4/
 Data_Final/
 
 # Bỏ qua các trọng số AI quá nặng (chỉ giữ lại code)
@@ -24,3 +26,11 @@ evidence/
 __pycache__/
 *.pyc
 .DS_Store
+runs/
+evaluation/
+*.pt
+*.engine
+*.onnx
+*.mp4
+*.avi
+__pycache__/

@@ -11,7 +11,7 @@ from pathlib import Path
 try:
     from ultralytics import YOLO
 except ImportError:
-    sys.exit("❌ ultralytics not installed. Install with: pip install ultralytics")
+    sys.exit(" ultralytics not installed. Install with: pip install ultralytics")
 
 # Import các đường dẫn từ trạm điều khiển trung tâm
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -28,7 +28,7 @@ class YOLOTrainer:
         self.weights_dir.mkdir(parents=True, exist_ok=True)
         
         if not self.data_yaml.exists():
-            sys.exit(f"❌ Lỗi: Không tìm thấy file {self.data_yaml}.")
+            sys.exit(f" Lỗi: Không tìm thấy file {self.data_yaml}.")
 
     def train_baseline(self, epochs: int, imgsz: int):
         """
@@ -36,7 +36,7 @@ class YOLOTrainer:
         Mục đích: Đo lường sức mạnh gốc của tập dữ liệu.
         """
         print("\n" + "="*70)
-        print("🚀 ĐANG HUẤN LUYỆN BASELINE MODEL (RAW & DEFAULT)")
+        print(" ĐANG HUẤN LUYỆN BASELINE MODEL (RAW & DEFAULT)")
         print("="*70)
         
         model = YOLO(f'yolov8{self.model_size}.pt')
@@ -51,7 +51,9 @@ class YOLOTrainer:
             device=DEVICE,
             project=str(self.weights_dir),
             name=run_name,
-            exist_ok=True
+            exist_ok=True,
+            workers=2, 
+            batch=16,
         )
         
         best_model_path = self.weights_dir / run_name / 'weights' / 'best.pt'
@@ -59,7 +61,7 @@ class YOLOTrainer:
         
         if best_model_path.exists():
             shutil.copy(best_model_path, target_path)
-            print(f"\n✅ Đã lưu mô hình Baseline nguyên bản tại: {target_path}")
+            print(f"\n Đã lưu mô hình Baseline nguyên bản tại: {target_path}")
 
     def train_optimized(self, epochs: int, imgsz: int, skip_train: bool = False):
         """
@@ -89,22 +91,24 @@ class YOLOTrainer:
                 lr0=0.001, lrf=0.01, warmup_epochs=3.0,
                 mosaic=1.0, mixup=0.1, copy_paste=0.1, degrees=10.0,
                 hsv_s=0.7, hsv_v=0.4,
-                close_mosaic=10, patience=25
+                close_mosaic=10, patience=25,
+                workers=2,
+                batch=16,
             )
             
             # Lưu file PyTorch đã tối ưu
             best_model_path = self.weights_dir / run_name / 'weights' / 'best.pt'
             if best_model_path.exists():
                 shutil.copy(best_model_path, optimized_pt_path)
-                print(f"\n✅ Đã lưu mô hình Optimized (.pt) tại: {optimized_pt_path}")
+                print(f"\n Đã lưu mô hình Optimized (.pt) tại: {optimized_pt_path}")
         else:
-            print("\n⏭️ Đã chọn Bỏ qua huấn luyện. Sử dụng file .pt có sẵn...")
+            print("\n Đã chọn Bỏ qua huấn luyện. Sử dụng file .pt có sẵn...")
             
         # --- BƯỚC BIÊN DỊCH TENSORRT ---
         if not optimized_pt_path.exists():
-            sys.exit(f"❌ Không tìm thấy file {optimized_pt_path}. Bạn phải train ít nhất 1 lần trước khi skip.")
+            sys.exit(f" Không tìm thấy file {optimized_pt_path}. Bạn phải train ít nhất 1 lần trước khi skip.")
             
-        print("\n⚙️ Đang biên dịch mô hình sang TensorRT FP16 để tăng tốc độ FPS...")
+        print("\n Đang biên dịch mô hình sang TensorRT FP16 để tăng tốc độ FPS...")
         model_export = YOLO(str(optimized_pt_path))
         model_export.export(
             format='engine', 
@@ -117,9 +121,9 @@ class YOLOTrainer:
         
         exported_engine = self.weights_dir / 'yolo_optimized.engine'
         if exported_engine.exists():
-            print(f"✅ Đã lưu mô hình TensorRT siêu tốc tại: {exported_engine}")
+            print(f" Đã lưu mô hình TensorRT siêu tốc tại: {exported_engine}")
         else:
-            print("⚠️ Train/Export xong nhưng bước xuất file TensorRT gặp sự cố. Vui lòng kiểm tra lại log.")
+            print(" Train/Export xong nhưng bước xuất file TensorRT gặp sự cố. Vui lòng kiểm tra lại log.")
 
 
 if __name__ == '__main__':
@@ -146,5 +150,5 @@ if __name__ == '__main__':
             trainer.train_optimized(epochs=optimized_epochs, imgsz=args.imgsz, skip_train=args.skip_train)
             
     except Exception as e:
-        print(f"\n❌ Đã xảy ra lỗi: {e}")
+        print(f"\n Đã xảy ra lỗi: {e}")
         sys.exit(1)

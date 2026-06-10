@@ -41,10 +41,11 @@ MIN_FPS = 15
 # 4. CLASSES & DETECTION PARAMETERS
 # ============================================================================
 CLASS_NAMES = {
-    0: "motorbike",
-    1: "car",
-    2: "truck",
-    3: "bus"
+    0: "Bike",
+    1: "Bus",
+    2: "Car",
+    3: "Motorbike",
+    4: "Truck"
 }
 
 CONFIDENCE_THRESHOLD = 0.5
@@ -88,7 +89,7 @@ LOG_COLUMNS = [
 # ============================================================================
 # Tên thư mục chứa dữ liệu hiện tại (nằm trong thư mục gốc của project). 
 # Khi bạn có bộ data mới (VD: "Data_New", "Data_Ver2"), chỉ cần đổi TÊN ở đây!
-DATASET_NAME = "Data_2"  
+DATASET_NAME = "Data_4"  
 
 # Hệ thống tự động nội suy ra các đường dẫn tuyệt đối
 DATASET_DIR = PROJECT_ROOT / DATASET_NAME
