@@ -7,6 +7,7 @@ import numpy as np
 import time
 import sys
 import argparse
+import queue
 
 # Core logic
 from core.datatypes import FrameState, ModelConfig
@@ -26,13 +27,15 @@ from utils.logger import ViolationLogger
 class TrafficMonitoringSystem:
     """Main orchestrator for real-time traffic monitoring pipeline"""
     
-    def __init__(self, model_type: str = 'pt', use_optimized: bool = False):
+    # CẬP NHẬT: Thêm tham số video_path để nhận nguồn động từ GUI
+    def __init__(self, video_path=None, model_type='pt', use_optimized=False):
         print("\n" + "="*80)
         print("🚗 REAL-TIME HIGHWAY TRAFFIC MONITORING SYSTEM")
         print("="*80)
         
         self.model_type = model_type
         self.use_optimized = use_optimized
+        self.video_path = video_path or VIDEO_SOURCE
         
         self.frame_count = 0
         self.start_time = time.time()
@@ -64,12 +67,22 @@ class TrafficMonitoringSystem:
         self.visualizer = Visualizer(draw_roi=DRAW_ROI_POLYGONS)
         self.logger = ViolationLogger()
         
-        # 4. Video Source
-        print(f"[4/5] Opening video source: {VIDEO_SOURCE}")
-        self.cap = cv2.VideoCapture(str(VIDEO_SOURCE))
-        if not self.cap.isOpened():
-            raise RuntimeError("Cannot open video source")
+        
+        # 4. Video Source (Sử dụng đường dẫn động)
+        print(f"[4/5] Opening video source: {self.video_path}")
+        
+        # CẬP NHẬT: Xử lý thông minh để nhận Webcam (số) hoặc File/Link (chuỗi)
+        if str(self.video_path).isdigit():
+            vid_src = int(self.video_path)  # Webcam ID: 0, 1, 2...
+        else:
+            vid_src = str(self.video_path)  # Link RTSP hoặc File MP4
             
+        self.cap = cv2.VideoCapture(vid_src)
+        
+        if not self.cap.isOpened():
+            raise RuntimeError(f"Cannot open video source: {self.video_path}")
+        
+        # ===> 3 DÒNG QUAN TRỌNG BỊ THIẾU LÀ Ở ĐÂY <===
         self.video_fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
         self.video_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.video_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -108,6 +121,7 @@ class TrafficMonitoringSystem:
         return frame_state
 
     def run(self, display: bool = True):
+        """Hàm chạy chế độ Terminal (CLI)"""
         print("\n" + "="*80)
         print("▶ Monitoring Started (Controls: Q=Quit, P=Pause)")
         print("="*80)
@@ -151,15 +165,12 @@ class TrafficMonitoringSystem:
         print("\n" + "="*80)
         print("SHUTTING DOWN SYSTEM...")
         
-        # Giải phóng giao diện và camera
         if hasattr(self, 'cap'): self.cap.release()
         if hasattr(self, 'video_writer') and self.video_writer: self.video_writer.release()
         cv2.destroyAllWindows()
         
-        # Đợi Logger ghi nốt các frame đang kẹt trong RAM xuống ổ cứng
         if hasattr(self, 'logger'): self.logger.stop()
         
-        # Thống kê hiệu năng
         total_time = time.time() - self.start_time
         avg_fps = np.mean(self.fps_history) if self.fps_history else 0
         total_veh = self.counter.get_total() if hasattr(self, 'counter') else 0
@@ -172,59 +183,71 @@ class TrafficMonitoringSystem:
         print(f"  Total Vehicles   : {total_veh}")
         print(f"  Total Violations : {total_viol}")
         print("="*80)
-        import cv2
-# ... (Giữ nguyên toàn bộ phần code từ đầu cho đến hết hàm shutdown(self) của bạn) ...
 
-def ai_engine_worker(video_source, frame_queue, stats_queue, is_running_func):
+# ============================================================================
+# LUỒNG AI KẾT NỐI VỚI GUI (ĐÃ CẬP NHẬT)
+# ============================================================================
+def ai_engine_worker(video_source, frame_queue, stats_queue, command_queue, is_running_func):
     """
-    Luồng chạy AI thực tế: Kết nối Class TrafficMonitoringSystem với Giao diện GUI
+    Luồng chạy AI thực tế: Chịu trách nhiệm giao tiếp an toàn với GUI.
     """
-    # 1. Khởi tạo hệ thống AI thật của bạn
-    # Mặc định dùng model đã tối ưu để chạy cho mượt
-    system = TrafficMonitoringSystem(model_type='pt', use_optimized=True)
-    
-    # Ghi đè nguồn video từ GUI (người dùng chọn file nào thì phân tích file đó)
-    if hasattr(system, 'cap') and system.cap:
-        system.cap.release()
-    system.cap = cv2.VideoCapture(video_source)
-    
-    while system.cap.isOpened() and is_running_func():
-        ret, frame = system.cap.read()
-        if not ret: break
-        
-        frame_start = time.time()
-        
-        # === PIPELINE LÕI AI THỰC TẾ ===
-        # Hàm này sẽ làm mọi thứ: Nhận diện, Đếm, Ghi Log, Vẽ Bbox...
-        frame_state = system.process_frame(frame)
-        
-        # Tính FPS hiện tại
-        process_time = time.time() - frame_start
-        current_fps = 1.0 / process_time if process_time > 0 else 0
-        
-        # Lấy số liệu thống kê THẬT từ các module
-        total_cars = system.counter.get_total() if hasattr(system, 'counter') else 0
-        violations = system.analyzer.get_violation_count() if hasattr(system, 'analyzer') else 0
-        
-        # 1. Đẩy khung hình (đã vẽ Bounding Box) sang GUI
-        if not frame_queue.full():
-            frame_queue.put(frame_state.processed_frame)
+    system = None
+    try:
+        # Khởi tạo trực tiếp với video_source từ GUI
+        system = TrafficMonitoringSystem(video_path=video_source, model_type='pt', use_optimized=True)
+    except Exception as e:
+        stats_queue.put({'action': 'engine_stopped', 'error': str(e)})
+        return
+
+    try:
+        while system.cap.isOpened() and is_running_func():
+            # 1. Đọc lệnh cấu hình từ GUI (nếu có)
+            try:
+                cmd = command_queue.get_nowait()
+                if cmd.get("action") == "set_confidence":
+                    new_val = cmd.get("value")
+                    if hasattr(system, 'detector') and hasattr(system.detector, 'config'):
+                        system.detector.config.confidence_threshold = new_val
+            except queue.Empty:
+                pass
+
+            # 2. Đọc và xử lý Frame
+            ret, frame = system.cap.read()
+            if not ret: 
+                break
             
-        # 2. Đẩy thông số thống kê sang GUI
-        if not stats_queue.full():
-            stats_queue.put({
-                'fps': current_fps,
-                'total_vehicles': total_cars,
-                'violations': violations
-            })
-
-    # Khi người dùng bấm "Dừng", gọi lệnh tắt an toàn để lưu file
-    system.shutdown()
-
+            frame_start = time.time()
+            frame_state = system.process_frame(frame)
+            
+            process_time = time.time() - frame_start
+            current_fps = 1.0 / process_time if process_time > 0 else 0
+            
+            total_cars = system.counter.get_total() if hasattr(system, 'counter') else 0
+            violations = system.analyzer.get_violation_count() if hasattr(system, 'analyzer') else 0
+            
+            # 3. Đẩy kết quả về GUI
+            if not frame_queue.full():
+                frame_queue.put(frame_state.processed_frame)
+                
+            if not stats_queue.full():
+                stats_queue.put({
+                    'action': 'processing',
+                    'fps': current_fps,
+                    'total_vehicles': total_cars,
+                    'violations': violations
+                })
+                
+    except Exception as e:
+        stats_queue.put({'action': 'engine_stopped', 'error': f"Lỗi runtime: {str(e)}"})
+    finally:
+        if system:
+            system.shutdown()
+        # Báo cho GUI biết đã dừng an toàn
+        stats_queue.put({'action': 'engine_stopped'})
 
 if __name__ == "__main__":
+    # Import Dashboard từ thư mục UI
     from ui.dashboard import TrafficDashboard
-    import argparse
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--cli', action='store_true', help="Chạy chế độ Terminal (Không mở GUI)")
@@ -233,10 +256,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.cli:
-        # Chạy chế độ màn hình đen đen truyền thống (Terminal)
         system = TrafficMonitoringSystem(model_type=args.model, use_optimized=args.optimized)
         system.run(display=True)
     else:
-        # Chạy chế độ Giao diện người dùng hiện đại (Mặc định)
         app = TrafficDashboard(ai_engine_callback=ai_engine_worker)
         app.mainloop()

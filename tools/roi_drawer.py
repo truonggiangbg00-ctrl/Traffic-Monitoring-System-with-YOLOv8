@@ -4,21 +4,20 @@ roi_drawer.py: Interactive ROI (Region of Interest) drawing tool
 
 import cv2
 import numpy as np
-import sys
 from pathlib import Path
 import argparse
+import sys
 
 class ROIDrawer:
     """Interactive ROI polygon drawing tool"""
     
-    def __init__(self, video_path: str, output_config: str = None):
+    def __init__(self, video_path: str):
         self.video_path = Path(video_path)
-        self.output_config = output_config
         
         if not self.video_path.exists():
             raise FileNotFoundError(f"Video not found: {video_path}")
             
-        print(f"📹 Loading video: {self.video_path}")
+        print(f"🎬 Loading video: {self.video_path}")
         cap = cv2.VideoCapture(str(self.video_path))
         ret, frame = cap.read()
         cap.release()
@@ -48,11 +47,11 @@ class ROIDrawer:
             self.mouse_pos = (x, y)
         elif event == cv2.EVENT_LBUTTONDOWN:
             self.current_polygon.append([x, y])
-            print(f"  📍 Point added: ({x}, {y}). Total points: {len(self.current_polygon)}")
+            print(f"   📍 Point added: ({x}, {y}). Total points: {len(self.current_polygon)}")
         elif event == cv2.EVENT_RBUTTONDOWN:
             if self.current_polygon:
                 removed = self.current_polygon.pop()
-                print(f"  ↩️ Point removed: {removed}. Remaining points: {len(self.current_polygon)}")
+                print(f"   ↩️ Point removed: {removed}. Remaining: {len(self.current_polygon)}")
     
     def _draw_frame(self) -> np.ndarray:
         display = self.base_frame.copy()
@@ -61,9 +60,10 @@ class ROIDrawer:
             pts = np.array(polygon, np.int32).reshape((-1, 1, 2))
             cv2.polylines(display, [pts], isClosed=True, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
             
+            # Làm nổi bật tên làn đường
             text_pos = tuple(polygon[0])
             cv2.rectangle(display, (text_pos[0]-5, text_pos[1]-25), (text_pos[0]+100, text_pos[1]+5), (0,0,0), -1)
-            cv2.putText(display, lane_name, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(display, lane_name, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
         
         if self.current_polygon:
             for i, pt in enumerate(self.current_polygon):
@@ -74,7 +74,7 @@ class ROIDrawer:
             if len(self.current_polygon) > 2:
                 cv2.line(display, tuple(self.current_polygon[-1]), tuple(self.current_polygon[0]), (0, 165, 255), 1, cv2.LINE_AA)
             
-            # Draw guide line
+            # Vẽ đường dẫn hướng (Guide line)
             cv2.line(display, tuple(self.current_polygon[-1]), self.mouse_pos, (255, 255, 255), 1, cv2.LINE_AA)
         
         self._draw_instructions(display)
@@ -90,8 +90,7 @@ class ROIDrawer:
             "  'N'        : Save lane",
             "  'C'        : Clear polygon",
             "  'SPACE'    : Delete last lane",
-            "  'Q'        : Finish & save",
-            "  'ESC'      : Cancel",
+            "  'Q' / 'ESC': Finish & save",
         ]
         overlay = frame.copy()
         cv2.rectangle(overlay, (5, 5), (320, 20 + len(instructions)*25), (0, 0, 0), -1)
@@ -103,7 +102,7 @@ class ROIDrawer:
             y_offset += 25
             
     def run(self) -> dict:
-        print("="*70 + "\n📐 INTERACTIVE ROI DRAWER\n" + "="*70)
+        print("="*70 + "\n🎯 INTERACTIVE ROI DRAWER\n" + "="*70)
         try:
             while True:
                 display_frame = self._draw_frame()
@@ -112,46 +111,74 @@ class ROIDrawer:
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord('n'), ord('N')):
                     if len(self.current_polygon) >= 3:
-                        lane_name = f"Lane_{self.lane_counter}"
+                        # Chuẩn hóa tên làn thành chữ IN HOA (VD: LANE_1)
+                        lane_name = f"LANE_{self.lane_counter}"
                         self.all_polygons[lane_name] = self.current_polygon.copy()
-                        print(f"✅ Lane saved: {lane_name}")
+                        print(f"✅ Đã lưu: {lane_name}")
                         self.current_polygon.clear()
                         self.lane_counter += 1
                     else:
-                        print("❌ Need at least 3 points!")
+                        print("❌ Cần ít nhất 3 điểm để tạo thành vùng (polygon)!")
                 elif key in (ord('c'), ord('C')):
                     self.current_polygon.clear()
-                    print("🧹 Cleared current polygon")
+                    print("🧹 Đã xóa vùng hiện tại")
                 elif key == 32:  # SPACE
                     if self.all_polygons:
                         removed = self.all_polygons.popitem()
-                        print(f"🗑️ Removed: {removed[0]}")
+                        print(f"🗑️ Đã xóa: {removed[0]}")
                         self.lane_counter -= 1
-                elif key in (ord('q'), ord('Q')):
+                elif key in (ord('q'), ord('Q'), 27):  # Q or ESC
                     if self.current_polygon:
-                        print("❌ Unsaved polygon. Press 'N' to save or 'C' to clear.")
-                    else: break
-                elif key == 27:  # ESC
-                    self.all_polygons.clear()
-                    break
+                        print("⚠️ Bạn đang vẽ dở. Nhấn 'N' để lưu hoặc 'C' để hủy trước khi thoát.")
+                    else: 
+                        break
         finally:
             cv2.destroyAllWindows()
         return self.all_polygons
     
     def save_config(self):
-        if not self.all_polygons: return
-        code = "LANE_POLYGONS = {\n"
+        if not self.all_polygons: 
+            print("⚠️ Không có vùng ROI nào được vẽ. Thoát chương trình.")
+            return
+            
+        code =  "import numpy as np\n\n"
+        code += "# " + "="*65 + "\n"
+        code += "# 🎯 CẤU HÌNH VÙNG ROI (Hãy copy đè đoạn này vào utils/config.py)\n"
+        code += "# " + "="*65 + "\n\n"
+        
+        # 1. Block LANE_POLYGONS
+        code += "LANE_POLYGONS = {\n"
         for lane_name, polygon in self.all_polygons.items():
-            code += f'    "{lane_name}": np.array({polygon}, dtype=np.int32),\n'
+            # Format mảng đẹp mắt trên 1 dòng
+            pts_str = ", ".join([f"[{x}, {y}]" for x, y in polygon])
+            code += f'    "{lane_name}": np.array([{pts_str}], dtype=np.int32),\n'
+        code += "}\n\n"
+        
+        # 2. Block LANE_RESTRICTIONS tự động
+        code += "# Quy định loại xe ĐƯỢC PHÉP chạy trên từng làn\n"
+        code += "# (Các xe không có trong danh sách này sẽ bị tính là Vi phạm đè/sai làn)\n"
+        code += "LANE_RESTRICTIONS = {\n"
+        for lane_name in self.all_polygons.keys():
+            # Tạo danh sách mẫu gồm các class phổ biến
+            code += f'    "{lane_name}": ["car", "bus", "truck"],  # Sửa lại tùy theo logic thực tế\n'
         code += "}\n"
         
-        print("\n" + "="*70 + "\n📋 COPY THIS CODE TO utils/config.py\n" + "="*70)
+        # In ra màn hình
+        print("\n" + "="*70)
+        print("🎉 ĐÃ TẠO XONG CẤU HÌNH! DƯỚI ĐÂY LÀ CODE CỦA BẠN:")
+        print("="*70 + "\n")
         print(code)
         print("="*70)
+        
+        # Tự động xuất ra file để tránh mất dữ liệu
+        output_file = Path("roi_output.txt")
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(code)
+        print(f"📁 Code cũng đã được lưu an toàn tại file: {output_file.absolute()}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('video', help='Path to video file')
+    parser.add_argument('video', help='Đường dẫn tới video cần vẽ ROI (VD: data/test_video.mp4)')
     args = parser.parse_args()
     drawer = ROIDrawer(args.video)
     if drawer.run():

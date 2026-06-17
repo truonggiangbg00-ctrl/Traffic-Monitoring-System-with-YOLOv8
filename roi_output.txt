@@ -1,0 +1,21 @@
+import numpy as np
+
+# =================================================================
+# 🎯 CẤU HÌNH VÙNG ROI (Hãy copy đè đoạn này vào utils/config.py)
+# =================================================================
+
+LANE_POLYGONS = {
+    "LANE_1": np.array([[441, 450], [706, 452], [561, 1074], [2, 1064]], dtype=np.int32),
+    "LANE_2": np.array([[706, 453], [921, 448], [1005, 1076], [558, 1072]], dtype=np.int32),
+    "LANE_3": np.array([[921, 447], [1138, 441], [1485, 1077], [1006, 1072]], dtype=np.int32),
+    "LANE_4": np.array([[1143, 438], [1374, 441], [1917, 927], [1918, 1068], [1497, 1074]], dtype=np.int32),
+}
+
+# Quy định loại xe ĐƯỢC PHÉP chạy trên từng làn
+# (Các xe không có trong danh sách này sẽ bị tính là Vi phạm đè/sai làn)
+LANE_RESTRICTIONS = {
+    "LANE_1": ["car", "bus", "truck"],  # Sửa lại tùy theo logic thực tế
+    "LANE_2": ["car", "bus", "truck"],  # Sửa lại tùy theo logic thực tế
+    "LANE_3": ["car", "bus", "truck"],  # Sửa lại tùy theo logic thực tế
+    "LANE_4": ["car", "bus", "truck"],  # Sửa lại tùy theo logic thực tế
+}

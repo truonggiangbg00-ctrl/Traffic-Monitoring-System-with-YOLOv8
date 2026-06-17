@@ -1,6 +1,5 @@
 """
 config.py: Centralized configuration for Real-time Traffic Monitoring System
-Định nghĩa toàn bộ đường dẫn, tham số ROI (vùng quan tâm), thông số model và luật giao thông.
 """
 
 import numpy as np
@@ -24,14 +23,15 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 USE_OPTIMIZED_MODEL = True  
 
 BASELINE_MODEL_PATH = str(WEIGHTS_DIR / "yolo_basic.pt")
-OPTIMIZED_MODEL_PATH = str(WEIGHTS_DIR / "yolo_optimized.engine")
+OPTIMIZED_MODEL_PATH = str(WEIGHTS_DIR / "yolo_optimized.pt")
 
 DEVICE = "cuda"
 
 # ============================================================================
 # 3. VIDEO SOURCE & PROPERTIES
 # ============================================================================
-VIDEO_SOURCE = str(PROJECT_ROOT / "Video Project.mp4")
+# Mặc định file nằm cùng cấp thư mục config hoặc project root
+VIDEO_SOURCE = str(PROJECT_ROOT / "Video_Project.mp4")
 
 FRAME_WIDTH = 1920
 FRAME_HEIGHT = 1080
@@ -50,23 +50,24 @@ CLASS_NAMES = {
 
 CONFIDENCE_THRESHOLD = 0.5
 IOU_THRESHOLD = 0.45
-# Số khung hình tối thiểu xe phải tồn tại liên tục để xác nhận đếm (Chống nhiễu AI)
 MIN_DETECTION_FRAMES = 3
+
 # ============================================================================
 # 5. LANE CONFIGURATION
 # ============================================================================
 LANE_POLYGONS = {
-    "Lane_1": np.array([[489, 400], [721, 395], [518, 1079], [0, 1053]], dtype=np.int32),
-    "Lane_2": np.array([[723, 396], [913, 390], [1021, 1077], [528, 1076]], dtype=np.int32),
-    "Lane_3": np.array([[918, 390], [1105, 380], [1569, 1077], [1027, 1074]], dtype=np.int32),
-    "Lane_4": np.array([[1110, 379], [1285, 350], [1919, 940], [1574, 1076]], dtype=np.int32),
+    "LANE_1": np.array([[441, 450], [706, 452], [561, 1074], [2, 1064]], dtype=np.int32),
+    "LANE_2": np.array([[706, 453], [921, 448], [1005, 1076], [558, 1072]], dtype=np.int32),
+    "LANE_3": np.array([[921, 447], [1138, 441], [1485, 1077], [1006, 1072]], dtype=np.int32),
+    "LANE_4": np.array([[1143, 438], [1374, 441], [1917, 927], [1918, 1068], [1497, 1074]], dtype=np.int32),
 }
 
+# ĐỒNG BỘ: Sửa lại phím chữ thường để khớp logic chuẩn lớp Detector
 LANE_RESTRICTIONS = {
-    "Lane_1": ["motorbike"],
-    "Lane_2": ["motorbike", "car"],
-    "Lane_3": ["car", "bus", "motorbike"],
-    "Lane_4": ["car", "truck"],
+    "LANE_1": ["motorbike", "bike"],
+    "LANE_2": ["motorbike", "car"],
+    "LANE_3": ["car", "bus", "motorbike"],
+    "LANE_4": ["car", "truck"],
 }
 
 # ============================================================================
@@ -84,13 +85,10 @@ LOG_COLUMNS = [
     "frame_id", "timestamp", "vehicle_id", "class_name", 
     "violation_type", "confidence", "bbox_bottom_center", "violation_lane"
 ]
-# ============================================================================
-# 7. DATASET CONFIGURATION (CẤU HÌNH DỮ LIỆU HUẤN LUYỆN)
-# ============================================================================
-# Tên thư mục chứa dữ liệu hiện tại (nằm trong thư mục gốc của project). 
-# Khi bạn có bộ data mới (VD: "Data_New", "Data_Ver2"), chỉ cần đổi TÊN ở đây!
-DATASET_NAME = "Data_4"  
 
-# Hệ thống tự động nội suy ra các đường dẫn tuyệt đối
+# ============================================================================
+# 7. DATASET CONFIGURATION
+# ============================================================================
+DATASET_NAME = "Data_4"  
 DATASET_DIR = PROJECT_ROOT / DATASET_NAME
 DATA_YAML_PATH = DATASET_DIR / "data.yaml"
