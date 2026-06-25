@@ -6,6 +6,7 @@ Defines standardized objects passed between modules
 from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Optional
 import numpy as np
+import time
 
 
 @dataclass
@@ -29,7 +30,7 @@ class TrackedVehicle:
     cls_name: str  # Class name (e.g., 'car', 'motorbike', 'bus', 'truck')
     conf: float  # Detection confidence score
     
-    # Violation tracking
+    # [THÊM LẠI 3 DÒNG NÀY ĐỂ FIX LỖI SẬP LUỒNG]
     is_violating: bool = False
     violation_lane: str = ""
     violation_type: str = ""
@@ -44,6 +45,18 @@ class TrackedVehicle:
 
 
 @dataclass
+class Violation:
+    """Detailed violation record"""
+    track_id: int
+    cls_name: str
+    violation_type: str
+    conf: float
+    bbox: Tuple[int, int, int, int]
+    violation_lane: str
+    timestamp: float = field(default_factory=lambda: time.time())
+
+
+@dataclass
 class FrameState:
     """State of a single frame after processing"""
     frame_id: int
@@ -52,7 +65,8 @@ class FrameState:
     
     vehicles: List[TrackedVehicle] = field(default_factory=list)
     counts: Dict[str, int] = field(default_factory=dict)
-    violations: List[TrackedVehicle] = field(default_factory=list)
+    # [FIX]: Sử dụng class Violation cho danh sách này
+    violations: List[Violation] = field(default_factory=list)
     
     timestamp: float = 0.0
     fps: float = 0.0

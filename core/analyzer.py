@@ -1,89 +1,70 @@
 """
 analyzer.py: Traffic violation detection using spatial analysis
-Detects lane violations using cv2.pointPolygonTest against ROI polygons
-Does NOT use Deep Learning - pure mathematical spatial logic
 """
 
 import cv2
 import numpy as np
-from typing import Dict, List, Set
-from .datatypes import FrameState, TrackedVehicle
-
+from .datatypes import FrameState, TrackedVehicle, Violation
 
 class TrafficAnalyzer:
-    """
-    Analyzes vehicle positions against lane restrictions
-    Uses cv2.pointPolygonTest to determine if vehicle is in a lane
-    Detects violations when a vehicle is in a restricted lane
-    """
-    
-    def __init__(self, lane_polygons: Dict[str, np.ndarray], 
-                 lane_restrictions: Dict[str, List[str]]):
-        self.lane_polygons = lane_polygons
-        
-        # Tiền xử lý (Pre-compute) danh sách xe cho phép
-        # Chuyển đổi list thành TẬP HỢP (Set) và đưa về chữ thường để lookup O(1)
-        self.lane_restrictions: Dict[str, Set[str]] = {
-            lane: {v.lower() for v in allowed}
-            for lane, allowed in lane_restrictions.items()
-        }
-        
-        self.violation_history: Set[int] = set()  # Lưu vết các ID đã vi phạm
-        self.current_violations: Dict[int, str] = {}  # Cache trạng thái lỗi hiện tại để chống nhấp nháy UI
-    
+    def __init__(self, lane_polygons: dict, lane_restrictions: dict):
+        self.lane_polygons = {}
+        if lane_polygons:
+            for name, pts in lane_polygons.items():
+                self.lane_polygons[name] = np.array(pts, dtype=np.int32).reshape((-1, 1, 2))
+
+        self.lane_restrictions = {}
+        if lane_restrictions:
+            for lane, allowed_classes in lane_restrictions.items():
+                self.lane_restrictions[lane] = [cls.lower() for cls in allowed_classes]
+
+        self.violation_history = set()
+
     def process(self, frame_state: FrameState) -> FrameState:
-        """Analyze frame for lane violations"""
-        violations = []
-        
+        if not hasattr(frame_state, 'vehicles') or not frame_state.vehicles:
+            return frame_state
+
         for vehicle in frame_state.vehicles:
-            # Ép kiểu float cho tọa độ điểm xét duyệt
-            test_point = (
-                float(vehicle.bottom_center[0]), 
-                float(vehicle.bottom_center[1])
-            )
-            
-            detected_lane = ""
-            is_violating_now = False
-            
-            # Kiểm tra xe đang nằm trong làn nào
+            vehicle_id = vehicle.track_id
+            cls_name_lower = vehicle.cls_name.strip().lower()
+
+            x1, y1, x2, y2 = vehicle.bbox
+            check_y = int(y2 - (y2 - y1) * 0.2)
+            check_point = (int((x1 + x2) / 2), check_y)
+            vehicle.check_point = check_point
+
+            current_lane = None
             for lane_name, polygon in self.lane_polygons.items():
-                if cv2.pointPolygonTest(polygon, test_point, measureDist=False) >= 0:
-                    detected_lane = lane_name
-                    break  # Tìm thấy làn thì dừng vòng lặp ngay
+                if cv2.pointPolygonTest(polygon, check_point, False) >= 0:
+                    current_lane = lane_name
+                    break
             
-            if detected_lane:
-                allowed_classes = self.lane_restrictions.get(detected_lane, set())
-                
-                # Logic vi phạm: Xe không nằm trong danh sách cho phép của làn
-                if vehicle.cls_name.lower() not in allowed_classes:
-                    is_violating_now = True
-                    vehicle.violation_lane = detected_lane
-                    vehicle.violation_type = "wrong_lane"
-                    
-                    self.violation_history.add(vehicle.track_id)
-                    self.current_violations[vehicle.track_id] = detected_lane
-            
-            # Logic chống nhấp nháy (Anti-flickering)
-            # Khắc phục đặc tính rung lắc BBox của YOLO trong môi trường giao thông phức tạp
-            if is_violating_now:
-                vehicle.is_violating = True
-                violations.append(vehicle)
-            elif vehicle.track_id in self.current_violations:
-                vehicle.is_violating = True
-                vehicle.violation_lane = self.current_violations[vehicle.track_id]
-                vehicle.violation_type = "wrong_lane"
-                violations.append(vehicle)
-        
-        # Dọn dẹp bộ nhớ (Garbage Collection): Xóa cache của các xe đã rời khung hình
-        current_track_ids = {v.track_id for v in frame_state.vehicles}
-        self.current_violations = {
-            tid: lane for tid, lane in self.current_violations.items() 
-            if tid in current_track_ids
-        }
-        
-        frame_state.violations = violations
-        
+            # Lưu lại tên làn để in ra GUI
+            vehicle.current_lane = current_lane
+
+            if current_lane and current_lane in self.lane_restrictions:
+                allowed_classes = self.lane_restrictions[current_lane]
+                # Lưu lại luật lệ để in ra GUI
+                vehicle.allowed_classes = allowed_classes
+
+                if cls_name_lower not in allowed_classes:
+                    vehicle.is_violating = True
+                    vehicle.violation_lane = current_lane
+                    vehicle.violation_type = "Đi Sai Làn"
+
+                    if vehicle_id not in self.violation_history:
+                        viol = Violation(
+                            track_id=vehicle_id,
+                            cls_name=vehicle.cls_name,
+                            violation_type="Đi Sai Làn",
+                            conf=vehicle.conf,
+                            bbox=vehicle.bbox,
+                            violation_lane=current_lane
+                        )
+                        frame_state.violations.append(viol)
+                        self.violation_history.add(vehicle_id)
+
         return frame_state
-    
-    def get_violation_count(self) -> int:
+
+    def get_violation_count(self):
         return len(self.violation_history)

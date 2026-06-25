@@ -122,11 +122,12 @@ class DetectorTracker:
                     
                     for box, track_id, cls_id, conf in zip(boxes, track_ids, class_ids, confidences):
                         # Ép kiểu tọa độ về int theo chuẩn của object TrackedVehicle
+                        # Trong file core/detector_tracker.py, đoạn for loop:
                         vehicle = TrackedVehicle(
                             track_id=int(track_id),
                             bbox=tuple(map(int, box)),
                             cls_id=int(cls_id),
-                            cls_name=class_names[int(cls_id)],
+                            cls_name=class_names[int(cls_id)].lower(), # [FIX]: Ép lowercase ngay tại đây
                             conf=float(conf)
                         )
                         frame_state.vehicles.append(vehicle)

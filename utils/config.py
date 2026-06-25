@@ -5,10 +5,17 @@ config.py: Centralized configuration for Real-time Traffic Monitoring System
 import numpy as np
 from pathlib import Path
 
+import sys
+
 # ============================================================================
-# 1. PROJECT ROOT & PATHS
+# 1. PROJECT ROOT & PATHS (TỰ ĐỘNG NHẬN DIỆN MÔI TRƯỜNG ĐÓNG GÓI)
 # ============================================================================
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if getattr(sys, 'frozen', False):
+    # Nếu chạy từ file .exe đã đóng gói, gốc dự án là thư mục chứa file .exe đó
+    PROJECT_ROOT = Path(sys.executable).resolve().parent
+else:
+    # Nếu đang code/dev bình thường bằng python main.py
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 WEIGHTS_DIR = PROJECT_ROOT / "weights"
 EVIDENCE_DIR = PROJECT_ROOT / "evidence"
@@ -16,7 +23,6 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 
 EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
 # ============================================================================
 # 2. MODEL PATHS & HARDWARE
 # ============================================================================
@@ -30,8 +36,7 @@ DEVICE = "cuda"
 # ============================================================================
 # 3. VIDEO SOURCE & PROPERTIES
 # ============================================================================
-# Mặc định file nằm cùng cấp thư mục config hoặc project root
-VIDEO_SOURCE = str(PROJECT_ROOT / "Video_Project.mp4")
+DEFAULT_VIDEO_SOURCE = ""  # Nguồn dự phòng (rỗng hoặc 0 cho Webcam)
 
 FRAME_WIDTH = 1920
 FRAME_HEIGHT = 1080
@@ -40,12 +45,13 @@ MIN_FPS = 15
 # ============================================================================
 # 4. CLASSES & DETECTION PARAMETERS
 # ============================================================================
+# Tên lớp phải đồng nhất với file data.yaml nhưng viết thường để so khớp logic
 CLASS_NAMES = {
-    0: "Bike",
-    1: "Bus",
-    2: "Car",
-    3: "Motorbike",
-    4: "Truck"
+    0: "bike",
+    1: "bus",
+    2: "car",
+    3: "motorbike",
+    4: "truck"
 }
 
 CONFIDENCE_THRESHOLD = 0.5
@@ -53,7 +59,7 @@ IOU_THRESHOLD = 0.45
 MIN_DETECTION_FRAMES = 3
 
 # ============================================================================
-# 5. LANE CONFIGURATION
+# 5. LANE CONFIGURATION (Dữ liệu dự phòng - Chỉ dùng nếu không vẽ ROI trong GUI)
 # ============================================================================
 LANE_POLYGONS = {
     "LANE_1": np.array([[441, 450], [706, 452], [561, 1074], [2, 1064]], dtype=np.int32),
@@ -62,7 +68,7 @@ LANE_POLYGONS = {
     "LANE_4": np.array([[1143, 438], [1374, 441], [1917, 927], [1918, 1068], [1497, 1074]], dtype=np.int32),
 }
 
-# ĐỒNG BỘ: Sửa lại phím chữ thường để khớp logic chuẩn lớp Detector
+# [QUAN TRỌNG]: Mọi giá trị phải viết thường để khớp với logic .lower()
 LANE_RESTRICTIONS = {
     "LANE_1": ["motorbike", "bike"],
     "LANE_2": ["motorbike", "car"],
