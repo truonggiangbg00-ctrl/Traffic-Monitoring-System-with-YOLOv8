@@ -1,7 +1,7 @@
 task: detect
 mode: train
-model: yolov8s.pt
-data: C:\Users\Zeng\CamChiu\Traffic_system_3\Data_4\data.yaml
+model: yolov8m.pt
+data: D:\Microsoft VS Code\CamChiu\Traffic_system_3\Data_4\data.yaml
 epochs: 100
 time: null
 patience: 100
@@ -12,7 +12,7 @@ save_period: -1
 cache: false
 device: '0'
 workers: 2
-project: C:\Users\Zeng\CamChiu\Traffic_system_3\weights
+project: D:\Microsoft VS Code\CamChiu\Traffic_system_3\weights
 name: traffic_baseline
 exist_ok: true
 pretrained: true
@@ -78,6 +78,8 @@ weight_decay: 0.0005
 warmup_epochs: 3.0
 warmup_momentum: 0.8
 warmup_bias_lr: 0.1
+distill_model: null
+dis: 6.0
 box: 7.5
 cls: 0.5
 cls_pw: 0.0
@@ -106,5 +108,5 @@ copy_paste_mode: flip
 auto_augment: randaugment
 erasing: 0.4
 cfg: null
-tracker: botsort.yaml
-save_dir: C:\Users\Zeng\CamChiu\Traffic_system_3\weights\traffic_baseline
+tracker: tracktrack.yaml
+save_dir: D:\Microsoft VS Code\CamChiu\Traffic_system_3\weights\traffic_baseline

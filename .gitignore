@@ -5,6 +5,7 @@ env/
 
 # Bỏ qua bộ dữ liệu huấn luyện (Dataset)
 Data/
+Data_1/
 Data_2/
 Data_3/
 Data_4/

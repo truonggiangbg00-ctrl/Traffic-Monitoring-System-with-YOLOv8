@@ -91,7 +91,7 @@ class YOLOTrainer:
                 lr0=0.001, lrf=0.01, warmup_epochs=3.0,
                 mosaic=1.0, mixup=0.1, copy_paste=0.1, degrees=10.0,
                 hsv_s=0.7, hsv_v=0.4,
-                close_mosaic=10, patience=25,
+                close_mosaic=10, patience=10,
                 workers=2,
                 batch=16,
             )
