@@ -69,9 +69,10 @@ class ModelEvaluator:
 
 if __name__ == "__main__":
     # Trỏ đến thư mục chứa kết quả train của Baseline hoặc Optimized
-    run_directory = PROJECT_ROOT / "weights" / "traffic_optimized" 
+    baseline_dir = PROJECT_ROOT / "weights" / "traffic_baseline"
+    optimized_dir = PROJECT_ROOT / "weights" / "traffic_optimized"
     yaml_file = PROJECT_ROOT / "Data_4" / "data.yaml"
     
-    evaluator = ModelEvaluator(str(run_directory))
+    evaluator = ModelEvaluator(str(baseline_dir))
     evaluator.plot_learning_curves()
     evaluator.run_validation(str(yaml_file))
